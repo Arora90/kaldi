@@ -15,11 +15,11 @@ if [ $stage -le 0 ]; then
 fi
 
 
-#image/nnet3/get_egs.sh --cmd "$train_cmd" data/train_t12 data/test exp/train_t12_egs
-#image/nnet3/get_egs.sh --cmd "$train_cmd" data/train_t3 data/test exp/train_t3_egs
+image/nnet3/get_egs.sh --cmd "$train_cmd" data/train_t12 data/test exp/train_t12_egs
+image/nnet3/get_egs.sh --cmd "$train_cmd" data/train_t3 data/test exp/train_t3_egs
 
 
 # prepare a different version of the egs with 2 instead of 3 archives.
-#image/nnet3/get_egs.sh --egs-per-archive 30000 --cmd "$train_cmd" data/train_t12 data/test exp/train_t12_egs2
-#image/nnet3/get_egs.sh --egs-per-archive 30000 --cmd "$train_cmd" data/train_t3 data/test exp/train_t3_egs2
+image/nnet3/get_egs.sh --egs-per-archive 30000 --cmd "$train_cmd" data/train_t12 data/test exp/train_t12_egs2
+image/nnet3/get_egs.sh --egs-per-archive 30000 --cmd "$train_cmd" data/train_t3 data/test exp/train_t3_egs2
 
