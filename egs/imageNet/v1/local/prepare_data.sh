@@ -59,8 +59,8 @@ else
   fi
   mkdir -p $train_t12
   tar -xvf $dl_dir/ILSVRC2012_img_train.tar -C $train_t12 || exit 1;
-  #find $train_t12 -name "*.tar" | while read NAME ; do mkdir -p "$train_t12/${NAME%.tar}"; tar -xvf "$train_t12/${NAME}" -C "$train_t12/${NAME%.tar}";
   echo Done downloading and extracting Training data, Task 1 and 2
+  find $train_t12 -name "*.tar" | while read NAME ;  do mkdir -p "${NAME%.tar}"; tar -xvf "${NAME}" -C "${NAME%.tar}";done
 fi
 
 if [ -d $train_t3 ]; then
@@ -72,8 +72,8 @@ else
   fi
   mkdir -p $train_t3
   tar -xvf $train_t3/ILSVRC2012_img_train_t3.tar -C $train_t3 || exit 1;
-  #find $train_t3 -name "*.tar" | while read NAME ; do mkdir -p "$train_t3/${NAME%.tar}"; tar -xvf "$train_t3/${NAME}" -C "$train_t12/${NAME%.tar}";
   echo Done downloading and extracting Training data, Task 3
+  find $train_t3 -name "*.tar" | while read NAME ;  do mkdir -p "${NAME%.tar}"; tar -xvf "${NAME}" -C "${NAME%.tar}";done
 fi
 
 #download and extract validation and test data
