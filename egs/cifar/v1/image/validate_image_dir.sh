@@ -53,15 +53,15 @@ if ! cmp <(awk '{print $1}' $dir/images.scp) <(awk '{print $1}' $dir/labels.txt)
   exit 1;
 fi
 
-if ! [[ $num_cols -eq $(tail -n 1 $dir/images.scp | feat-to-dim $paf scp:- -) ]]; then
-  echo "$0: the number of columns in the image matrices is not consistent."
-  exit 1
-fi
-
-if ! [[ $num_rows -eq $(tail -n 1 $dir/images.scp | feat-to-len $paf scp:- ark,t:- | awk '{print $2}') ]]; then
-  echo "$0: the number of rows in the image matrices is not consistent."
-  exit 1
-fi
+#if ! [[ $num_cols -eq $(tail -n 1 $dir/images.scp | feat-to-dim $paf scp:- -) ]]; then
+#  echo "$0: the number of columns in the image matrices is not consistent."
+#  exit 1
+#fi
+#
+#if ! [[ $num_rows -eq $(tail -n 1 $dir/images.scp | feat-to-len $paf scp:- ark,t:- | awk '{print $2}') ]]; then
+#  echo "$0: the number of rows in the image matrices is not consistent."
+#  exit 1
+#fi
 
 # Note: we don't require images.scp and labels.txt to be sorted, but they
 # may not contain repeated keys.
