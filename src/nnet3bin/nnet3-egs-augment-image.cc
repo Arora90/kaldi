@@ -1,25 +1,4 @@
-// nnet3bin/nnet3-egs-augment-image.cc
-
-// Copyright      2017  Johns Hopkins University (author:  Daniel Povey)
-//                2017  Hossein Hadian
-//                2017  Yiwen Shao
-
-// See ../../COPYING for clarification regarding multiple authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//  http://www.apache.org/licenses/LICENSE-2.0
-//
-// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
-// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-// MERCHANTABLITY OR NON-INFRINGEMENT.
-// See the Apache 2 License for the specific language governing permissions and
-// limitations under the License.
-
-#include "base/kaldi-common.h"
+nclude "base/kaldi-common.h"
 #include "util/common-utils.h"
 #include "hmm/transition-model.h"
 #include "nnet3/nnet-example.h"
@@ -36,13 +15,15 @@ struct ImageAugmentationConfig {
   BaseFloat horizontal_shift;
   BaseFloat vertical_shift;
   std::string fill_mode_string;
+  std::bool IfImageNet;
 
   ImageAugmentationConfig():
       num_channels(1),
       horizontal_flip_prob(0.0),
       horizontal_shift(0.0),
       vertical_shift(0.0),
-      fill_mode_string("nearest") { }
+      fill_mode_string("nearest")
+      IfImageNet(False) { }
 
 
   void Register(ParseOptions *po) {
@@ -60,6 +41,8 @@ struct ImageAugmentationConfig {
     po->Register("fill-mode", &fill_mode_string, "Mode for dealing with "
 		 "points outside the image boundary when applying transformation. "
 		 "Choices = {nearest, reflect}");
+    po->Register("IfImageNet", &IfImageNet, "True for ImageNet database.
+      ImageNet have variable size images, so it requires additional processing");
   }
 
   void Check() const {
@@ -69,6 +52,7 @@ struct ImageAugmentationConfig {
     KALDI_ASSERT(horizontal_shift >= 0 && horizontal_shift <= 1);
     KALDI_ASSERT(vertical_shift >= 0 && vertical_shift <= 1);
     KALDI_ASSERT(fill_mode_string == "nearest" || fill_mode_string == "reflect");
+    KALDI_ASSERT(fill_mode_string == True || fill_mode_string == False);
   }
 
   FillMode GetFillMode() const {
@@ -275,6 +259,88 @@ void PerturbImage(const ImageAugmentationConfig &config,
   ApplyAffineTransform(transform_mat, config.num_channels, image, fill_mode);
 }
 
+void CropAndResizeImage(const ImageAugmentationConfig &config,
+                  MatrixBase<BaseFloat> *image) {
+  config.Check();
+  FillMode fill_mode = config.GetFillMode();
+  int32 image_width = image->NumRows(),
+      num_channels = config.num_channels,
+      image_height = image->NumCols() / num_channels;
+  if (image->NumCols() % num_channels != 0) {
+    KALDI_ERR << "Number of columns in image must divide the number "
+        "of channels";
+  }
+  // We do an affine transform which
+  // handles flipping, translation, rotation, magnification, and shear.
+  Matrix<BaseFloat> transform_mat(3, 3, kUndefined);
+  transform_mat.SetUnit();
+
+  Matrix<BaseFloat> shift_mat(3, 3, kUndefined);
+  shift_mat.SetUnit();
+  // translation (shift) mat:
+  // [ 1   0  x_shift
+  //   0   1  y_shift
+  //   0   0  1       ]
+  BaseFloat horizontal_shift = (2.0 * RandUniform() - 1.0) *
+      config.horizontal_shift * image_width;
+  BaseFloat vertical_shift = (2.0 * RandUniform() - 1.0) *
+      config.vertical_shift * image_height;
+  shift_mat(0, 2) = round(horizontal_shift);
+  shift_mat(1, 2) = round(vertical_shift);
+  // since we will center the image before applying the transform,
+  // horizontal flipping is simply achieved by setting [0, 0] to -1:
+  if (WithProb(config.horizontal_flip_prob))
+    shift_mat(0, 0) = -1.0;
+
+  Matrix<BaseFloat> rotation_mat(3, 3, kUndefined);
+  rotation_mat.SetUnit();
+  // rotation mat:
+  // [ cos(theta)  -sin(theta)  0
+  //   sin(theta)  cos(theta)   0
+  //   0           0            1 ]
+
+  Matrix<BaseFloat> shear_mat(3, 3, kUndefined);
+  shear_mat.SetUnit();
+  // shear mat:
+  // [ 1    -sin(shear)   0
+  //   0     cos(shear)   0
+  //   0     0            1 ]
+
+  Matrix<BaseFloat> zoom_mat(3, 3, kUndefined);
+  zoom_mat.SetUnit();
+  // zoom mat:
+  // [ x_zoom   0   0
+  //   0   y_zoom   0
+  //   0     0      1 ]
+
+  // transform_mat = rotation_mat * shift_mat * shear_mat * zoom_mat:
+  transform_mat.AddMatMat(1.0, shift_mat, kNoTrans,
+                          shear_mat, kNoTrans, 0.0);
+  transform_mat.AddMatMatMat(1.0, rotation_mat, kNoTrans,
+                             transform_mat, kNoTrans,
+                             zoom_mat, kNoTrans, 0.0);
+  if (transform_mat.IsUnit())  // nothing to do
+    return;
+
+  // we should now change the origin of transform to the center of
+  // the image (necessary for flipping, zoom, shear, and rotation)
+  // we do this by using two translations: one before the main transform
+  // and one after.
+  Matrix<BaseFloat> set_origin_mat(3, 3, kUndefined);
+  set_origin_mat.SetUnit();
+  set_origin_mat(0, 2) = image_width / 2.0 - 0.5;
+  set_origin_mat(1, 2) = image_height / 2.0 - 0.5;
+  Matrix<BaseFloat> reset_origin_mat(3, 3, kUndefined);
+  reset_origin_mat.SetUnit();
+  reset_origin_mat(0, 2) = -image_width / 2.0 + 0.5;
+  reset_origin_mat(1, 2) = -image_height / 2.0 + 0.5;
+
+  // transform_mat = set_origin_mat * transform_mat * reset_origin_mat
+  transform_mat.AddMatMatMat(1.0, set_origin_mat, kNoTrans,
+                             transform_mat, kNoTrans,
+                             reset_origin_mat, kNoTrans, 0.0);
+  ApplyAffineTransform(transform_mat, config.num_channels, image, fill_mode);
+}
 
 /**
    This function does image perturbation as directed by 'config'
@@ -296,6 +362,9 @@ void PerturbImageInNnetExample(
       // We won't recompress, but this won't matter because this
       // program is intended to be used as part of a pipe, we
       // likely won't be dumping the perturbed data to disk.
+      if(config.IfImageNet)
+        CropAndResizeImage(config, &image);
+      
       PerturbImage(config, &image);
 
       // modify the 'io' object.
