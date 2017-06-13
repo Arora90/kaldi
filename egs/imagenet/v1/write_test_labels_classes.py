@@ -32,7 +32,7 @@ img_id = 1
 for label in f.readlines():
     if args.if10cropTestData:
         for i in range(10):
-            id += (int(img_id) - 1) * 10 + i + 1
+            id = (int(img_id) - 1) * 10 + i + 1
             key = zeropad(id, 8)
             labels_fh.write(key + ' ' + str(label))
     else:
