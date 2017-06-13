@@ -9,6 +9,7 @@
 
 import scipy.io
 import os
+import sys
 
 parser = argparse.ArgumentParser(description="""Converts train/test data of
                                                 Imagenet 2012 to
