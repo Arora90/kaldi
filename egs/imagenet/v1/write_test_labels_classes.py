@@ -36,8 +36,8 @@ classes_fh=open(classes_file, 'wb')
 
 for i in range(1000):
     WNID_val = meta_data['synsets']['WNID'][i][0][0].encode('ascii', 'ignore')
-    ILSVRC2012_ID_val = meta_data['synsets']['ILSVRC2012_ID'][i][0][0][0]
-    val = str(ILSVRC2012_ID_val) + '  ' + str(WNID_val)
+    ILSVRC2012_ID_val = int(meta_data['synsets']['ILSVRC2012_ID'][i][0][0][0]) - 1
+    val = str(WNID_val) + '  ' + str(ILSVRC2012_ID_val)
     classes_fh.write(val)
     classes_fh.write("\n")
 
