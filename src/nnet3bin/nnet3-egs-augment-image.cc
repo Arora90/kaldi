@@ -44,8 +44,8 @@ struct ImageAugmentationConfig {
       horizontal_flip_prob(0.0),
       horizontal_shift(0.0),
       vertical_shift(0.0),
-      fill_mode_string("nearest")
-      ifImageNet(False) 
+      fill_mode_string("nearest"),
+      ifImageNet(False), 
       cropside(224) { }
 
 
