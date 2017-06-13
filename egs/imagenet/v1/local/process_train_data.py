@@ -82,8 +82,8 @@ WNID_classID_mappping = classes_fh.readlines()
 list_WNID = []
 list_classid = []
 for line_str in WNID_classID_mappping:
-    list_classid += [line_str.split('  ')[0]]
-    list_WNID += [line_str.split('  ')[1][0:-1]]
+    list_WNID += [line_str.split('  ')[0]]
+    list_classid += [line_str.split('  ')[1][0:-1]]
 
 if args.out_ark == '-':
   out_fh = sys.stdout  # output file handle to write the feats to
