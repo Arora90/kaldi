@@ -1,9 +1,30 @@
-nclude "base/kaldi-common.h"
+// nnet3bin/nnet3-egs-augment-image.cc
+
+// Copyright      2017  Johns Hopkins University (author:  Daniel Povey)
+//                2017  Hossein Hadian
+//                2017  Yiwen Shao
+
+// See ../../COPYING for clarification regarding multiple authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//  http://www.apache.org/licenses/LICENSE-2.0
+//
+// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+// MERCHANTABLITY OR NON-INFRINGEMENT.
+// See the Apache 2 License for the specific language governing permissions and
+// limitations under the License.
+
+#include "base/kaldi-common.h"
 #include "util/common-utils.h"
 #include "hmm/transition-model.h"
 #include "nnet3/nnet-example.h"
 #include "nnet3/nnet-example-utils.h"
-
+#include "base/kaldi-math.h"
 namespace kaldi {
 namespace nnet3 {
 
@@ -15,7 +36,8 @@ struct ImageAugmentationConfig {
   BaseFloat horizontal_shift;
   BaseFloat vertical_shift;
   std::string fill_mode_string;
-  std::bool IfImageNet;
+  std::bool ifImageNet;
+  int32 cropside;
 
   ImageAugmentationConfig():
       num_channels(1),
@@ -23,7 +45,8 @@ struct ImageAugmentationConfig {
       horizontal_shift(0.0),
       vertical_shift(0.0),
       fill_mode_string("nearest")
-      IfImageNet(False) { }
+      ifImageNet(False) 
+      cropside(224) { }
 
 
   void Register(ParseOptions *po) {
@@ -41,8 +64,9 @@ struct ImageAugmentationConfig {
     po->Register("fill-mode", &fill_mode_string, "Mode for dealing with "
 		 "points outside the image boundary when applying transformation. "
 		 "Choices = {nearest, reflect}");
-    po->Register("IfImageNet", &IfImageNet, "True for ImageNet database.
+    po->Register("IfImageNet", &ifImageNet, "True for ImageNet database.
       ImageNet have variable size images, so it requires additional processing");
+    po->Register("Cropside", &cropside, "Crop Width or crop height = 224 fixed.");
   }
 
   void Check() const {
@@ -52,7 +76,8 @@ struct ImageAugmentationConfig {
     KALDI_ASSERT(horizontal_shift >= 0 && horizontal_shift <= 1);
     KALDI_ASSERT(vertical_shift >= 0 && vertical_shift <= 1);
     KALDI_ASSERT(fill_mode_string == "nearest" || fill_mode_string == "reflect");
-    KALDI_ASSERT(fill_mode_string == True || fill_mode_string == False);
+    KALDI_ASSERT(ifImageNet == True || ifImageNet == False);
+    KALDI_ASSERT(cropside == 224);
   }
 
   FillMode GetFillMode() const {
@@ -258,8 +283,7 @@ void PerturbImage(const ImageAugmentationConfig &config,
                              reset_origin_mat, kNoTrans, 0.0);
   ApplyAffineTransform(transform_mat, config.num_channels, image, fill_mode);
 }
-
-void CropAndResizeImage(const ImageAugmentationConfig &config,
+void ResizeImage(const ImageAugmentationConfig &config,
                   MatrixBase<BaseFloat> *image) {
   config.Check();
   FillMode fill_mode = config.GetFillMode();
@@ -270,6 +294,9 @@ void CropAndResizeImage(const ImageAugmentationConfig &config,
     KALDI_ERR << "Number of columns in image must divide the number "
         "of channels";
   }
+
+  int32 scale = RandInt(256,480);
+
   // We do an affine transform which
   // handles flipping, translation, rotation, magnification, and shear.
   Matrix<BaseFloat> transform_mat(3, 3, kUndefined);
@@ -281,16 +308,6 @@ void CropAndResizeImage(const ImageAugmentationConfig &config,
   // [ 1   0  x_shift
   //   0   1  y_shift
   //   0   0  1       ]
-  BaseFloat horizontal_shift = (2.0 * RandUniform() - 1.0) *
-      config.horizontal_shift * image_width;
-  BaseFloat vertical_shift = (2.0 * RandUniform() - 1.0) *
-      config.vertical_shift * image_height;
-  shift_mat(0, 2) = round(horizontal_shift);
-  shift_mat(1, 2) = round(vertical_shift);
-  // since we will center the image before applying the transform,
-  // horizontal flipping is simply achieved by setting [0, 0] to -1:
-  if (WithProb(config.horizontal_flip_prob))
-    shift_mat(0, 0) = -1.0;
 
   Matrix<BaseFloat> rotation_mat(3, 3, kUndefined);
   rotation_mat.SetUnit();
@@ -308,6 +325,14 @@ void CropAndResizeImage(const ImageAugmentationConfig &config,
 
   Matrix<BaseFloat> zoom_mat(3, 3, kUndefined);
   zoom_mat.SetUnit();
+  if(image_width<image_height){
+  zoom_mat(0, 0) = scale/image_width;
+  zoom_mat(1, 1) = scale/image_width;
+  }
+  else{
+  zoom_mat(0, 0) = scale/image_height;
+  zoom_mat(1, 1) = scale/image_height;
+  }
   // zoom mat:
   // [ x_zoom   0   0
   //   0   y_zoom   0
@@ -341,6 +366,40 @@ void CropAndResizeImage(const ImageAugmentationConfig &config,
                              reset_origin_mat, kNoTrans, 0.0);
   ApplyAffineTransform(transform_mat, config.num_channels, image, fill_mode);
 }
+void CropImage(const ImageAugmentationConfig &config,
+                  MatrixBase<BaseFloat> *image) {
+  config.Check();
+  FillMode fill_mode = config.GetFillMode();
+  int32 image_width = image->NumRows(),
+      num_channels = config.num_channels,
+      image_height = image->NumCols() / num_channels;
+  if (image->NumCols() % num_channels != 0) {
+    KALDI_ERR << "Number of columns in image must divide the number "
+        "of channels";
+  }
+  
+  int32 croplocationX = RandInt(0,(image_width - config.cropside));
+  int32 croplocationY = RandInt(0,(image_height - config.cropside)) * num_channels;
+  Matrix<BaseFloat> temp_image(config.cropside, config.cropside*num_channels);
+
+  Matrix<BaseFloat> original_image(*image);
+  for (int32 r = 0; r < config.CropWidth; r++) {
+    for (int32 c = 0; c < config.CropHeight; c++) {
+      for (int32 ch = 0; ch < num_channels; ch++) {
+        BaseFloat p11 = original_image(r + croplocationX, num_channels * c + croplocationY + ch);
+        temp_image(r, num_channels * c + ch) = p11;
+      }
+    }
+  }
+*image = temp_image;
+}
+
+
+void CropAndResizeImage(const ImageAugmentationConfig &config,
+                  MatrixBase<BaseFloat> *image){
+  CropImage(config, &image);
+  ResizeImage(config, &image);
+}
 
 /**
    This function does image perturbation as directed by 'config'
@@ -364,7 +423,7 @@ void PerturbImageInNnetExample(
       // likely won't be dumping the perturbed data to disk.
       if(config.IfImageNet)
         CropAndResizeImage(config, &image);
-      
+
       PerturbImage(config, &image);
 
       // modify the 'io' object.
@@ -442,3 +501,4 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 }
+
