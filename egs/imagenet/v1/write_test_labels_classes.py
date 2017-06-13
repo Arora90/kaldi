@@ -7,6 +7,7 @@
 """ This script reads and writes classes and labels data
 """
 
+import argparse
 import scipy.io
 import os
 import sys
