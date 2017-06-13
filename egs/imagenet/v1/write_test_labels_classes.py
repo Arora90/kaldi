@@ -10,6 +10,12 @@
 import scipy.io
 import os
 
+parser = argparse.ArgumentParser(description="""Converts train/test data of
+                                                Imagenet 2012 to
+                                                Kaldi feature format""")
+parser.add_argument('if10cropTestData', type=bool, default = 'true')
+args = parser.parse_args()
+
 def zeropad(x, length):
   s = str(x)
   while len(s) < length:
@@ -22,8 +28,14 @@ f = open("data/download/devkit_t12/ILSVRC2012_devkit_t12/data/ILSVRC2012_validat
 
 img_id = 1
 for label in f.readlines():
-    key = zeropad(img_id, 8)
-    labels_fh.write(key + ' ' + str(label))
+    if args.if10cropTestData:
+        for i in range(10):
+            id += [str((int(img_id) - 1) * 10 + i + 1)]
+            key = zeropad(id, 8)
+            labels_fh.write(key + ' ' + str(label))
+    else:
+        key = zeropad(img_id, 8)
+        labels_fh.write(key + ' ' + str(label))
     img_id += 1
 
 labels_fh.close()
@@ -42,3 +54,4 @@ for i in range(1000):
     classes_fh.write("\n")
 
 classes_fh.close()
+
