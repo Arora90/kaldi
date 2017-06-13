@@ -22,6 +22,7 @@ val_data=$dl_dir/test
 val_data_url=http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_val.tar
 test_data=$dl_dir/test2_wo_labels
 test_data_url=http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_test.tar
+ifAugmentTestData = true 
 
 mkdir -p $dl_dir
 #download and extract development kit for task 1,2, and 3
@@ -104,7 +105,7 @@ fi
 # create train and test directory
 mkdir -p data/{train_t12,train_t3,test}/data
 
-write_test_labels_classes.py
+write_test_labels_classes.py $ifAugmentTestData
 cp data/test/classes.txt data/train_t12/classes.txt
 cp data/test/classes.txt data/train_t3/classes.txt
 
@@ -112,7 +113,7 @@ echo 3 > data/train_t12/num_channels
 echo 3 > data/train_t3/num_channels
 echo 3 > data/test/num_channels
 
-local/process_test_data.py $val_data True| \
+local/process_test_data.py $val_data $ifAugmentTestData| \
   copy-feats --compress=true --compression-method=7 \
     ark:- ark,scp:data/test/data/images.ark,data/test/images.scp || exit 1
 
