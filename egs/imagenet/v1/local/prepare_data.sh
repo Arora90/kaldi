@@ -105,7 +105,7 @@ fi
 # create train and test directory
 mkdir -p data/{train_t12,train_t3,test}/data
 
-write_test_labels_classes.py $ifAugmentTestData
+write_test_labels_classes.py true
 cp data/test/classes.txt data/train_t12/classes.txt
 cp data/test/classes.txt data/train_t3/classes.txt
 
@@ -113,7 +113,7 @@ echo 3 > data/train_t12/num_channels
 echo 3 > data/train_t3/num_channels
 echo 3 > data/test/num_channels
 
-local/process_test_data.py $val_data $ifAugmentTestData 256 224| \
+local/process_test_data.py $val_data true 256 224| \
   copy-feats --compress=true --compression-method=7 \
     ark:- ark,scp:data/test/data/images.ark,data/test/images.scp || exit 1
 
