@@ -19,6 +19,8 @@ parser.add_argument('database', type=str,
                     default='data/download/test',
                     help='path to downloaded imagenet test data')
 parser.add_argument('if10cropTestData', type=bool, default = 'true')
+parser.add_argument('scale', type=int, default = 256)
+parser.add_argument('cropside', type=int, default = 224)
 parser.add_argument('--out-ark', type=str, default='-', help='where to write output feature data')
 args = parser.parse_args()
 
@@ -35,7 +37,7 @@ def load_imagenet_test_data(datafile):
                 curr_image_id = temp_image_id.split('.')[0]
                 if len(img.shape)==2:
                     img = np.repeat(img[...,None],3,axis=2)
-		if args.if10cropTestData:
+                if args.if10cropTestData:
                     cropped_images, ids = get_test_images(img,curr_image_id)
                     image_id = image_id + ids
                     for i in range(10):
@@ -45,9 +47,9 @@ def load_imagenet_test_data(datafile):
                         C = img.shape[2]
                         img = np.reshape(np.transpose(img, (1, 0, 2)), (W, H * C))
                         data += [img]
-		else:
-		    image_id += [curr_image_id]
-		    H = img.shape[0]
+                else:
+                    image_id += [curr_image_id]
+                    H = img.shape[0]
                     W = img.shape[1]
                     C = img.shape[2]
                     img = np.reshape(np.transpose(img, (1, 0, 2)), (W, H * C))
@@ -71,6 +73,7 @@ def write_kaldi_matrix(file_handle, matrix, key):
             file_handle.write("\n")
     file_handle.write(" ]\n")
 
+
 def get_test_images(img, image_id):
     # get image dimensions
     H = img.shape[0]
@@ -78,43 +81,48 @@ def get_test_images(img, image_id):
     C = img.shape[2]
 
     # isotropically resize image with smaller side = 256
-    if(H<W):
-        resize_width = int(round(float(W*256.0)/float(H)))
-        width_center = int(round(float(resize_width)/2.0))
-        image_resized = misc.imresize(img, (256, resize_width, C))
-        crop_image = image_resized[:, int(width_center-128):int(width_center+128), :]
+    if (H < W):
+        resize_width = int(round(float(W * scale) / float(H)))
+        width_center = int(round(float(resize_width) / 2.0))
+        image_resized = misc.imresize(img, (scale, resize_width, C))
+        crop_image = image_resized[:, int(width_center - half_scale):int(width_center + half_scale), :]
     else:
-        resize_height = int(round(float(H * 256.0) / float(W)))
+        resize_height = int(round(float(H * scale) / float(W)))
         height_center = int(round(float(resize_height) / 2.0))
-        image_resized = misc.imresize(img, (resize_height, 256, C))
-        crop_image = image_resized[int(height_center - 128):int(height_center + 128), :, :]
+        image_resized = misc.imresize(img, (resize_height, scale, C))
+        crop_image = image_resized[int(height_center - half_scale):int(height_center + half_scale), :, :]
 
     # 10 (224,224) crop testing
-    crop1 = crop_image[:224,:224,:]
-    crop2 = crop_image[(256 - 224):,:224,:]
-    crop3 = crop_image[(256 - 224):,(256 - 224):,:]
-    crop4 = crop_image[:224,(256 - 224):,:]
-    crop5 = crop_image[(128 - 112):(128 + 112), (128 - 112):(128 + 112), :]
+    crop1 = crop_image[:cropside, :cropside, :]
+    crop2 = crop_image[(scale - cropside):, :cropside, :]
+    crop3 = crop_image[(scale - cropside):, (scale - cropside):, :]
+    crop4 = crop_image[:cropside, (scale - cropside):, :]
+    crop5 = crop_image[(half_scale - half_crop):(half_scale + half_crop), (half_scale - half_crop):(half_scale + half_crop), :]
 
     crop_image_hreflection = np.flipud(crop_image)
-    crop6 = crop_image_hreflection[:224, :224, :]
-    crop7 = crop_image_hreflection[(256 - 224):, :224, :]
-    crop8 = crop_image_hreflection[(256 - 224):, (256 - 224):, :]
-    crop9 = crop_image_hreflection[:224, (256 - 224):, :]
-    crop10 = crop_image_hreflection[(128 - 112):(128 + 112), (128 - 112):(128 + 112), :]
+    crop6 = crop_image_hreflection[:cropside, :cropside, :]
+    crop7 = crop_image_hreflection[(scale - cropside):, :cropside, :]
+    crop8 = crop_image_hreflection[(scale - cropside):, (scale - cropside):, :]
+    crop9 = crop_image_hreflection[:cropside, (scale - cropside):, :]
+    crop10 = crop_image_hreflection[(half_scale - half_crop):(half_scale + half_crop), (half_scale - half_crop):(half_scale + half_crop), :]
 
     id = []
     for i in range(10):
-        id  += [str((int(image_id) - 1)*10 + i +1)]
+        id += [str((int(image_id) - 1) * 10 + i + 1)]
     cropped_images = [crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8, crop9, crop10]
     return cropped_images, id
 
+
 ### main ###
 if args.out_ark == '-':
-  out_fh = sys.stdout  # output file handle to write the feats to
+    out_fh = sys.stdout  # output file handle to write the feats to
 else:
-  out_fh = open(args.out_ark, 'wb')
+    out_fh = open(args.out_ark, 'wb')
 
+cropside = int(args.cropside)
+scale = int(args.scale)
+half_scale = int(scale/2)
+half_crop = int(cropside/2)
 fpath = args.database
 data, img_IDS = load_imagenet_test_data(fpath)
 num_images = len(img_IDS)
