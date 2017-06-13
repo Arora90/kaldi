@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description="""Converts train/test data of
 parser.add_argument('database', type=str,
                     default='data/download/test',
                     help='path to downloaded imagenet test data')
-parser.add_argument('If10cropTestData', type=bool, default = 'True')
+parser.add_argument('if10cropTestData', type=bool, default = 'true')
 parser.add_argument('--out-ark', type=str, default='-', help='where to write output feature data')
 args = parser.parse_args()
 
@@ -35,7 +35,7 @@ def load_imagenet_test_data(datafile):
                 curr_image_id = temp_image_id.split('.')[0]
                 if len(img.shape)==2:
                     img = np.repeat(img[...,None],3,axis=2)
-		if args.If10cropTestData:
+		if args.if10cropTestData:
                     cropped_images, ids = get_test_images(img,curr_image_id)
                     image_id = image_id + ids
                     for i in range(10):
